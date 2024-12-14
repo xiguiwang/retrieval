@@ -15,10 +15,10 @@ def create_index():
         r.ft("myIndex").create_index([
             VectorField("vector", "FLAT", { "TYPE": "float32", "DIM": vector_dimension, "DISTANCE_METRIC": "COSINE" }),
             TagField("id")  # Store the ID for easy lookup
-        ], definition=IndexDefinition(prefix=["image:", "text:"], index_type=IndexType.HASH))
+        ], definition=IndexDefinition(prefix=["image:"], index_type=IndexType.HASH))
         print("Index created successfully.")
     except Exception as e:
         print(f"Error creating index: {e}")
 
 # Run the index creation function
-create_index()
+#create_index()
