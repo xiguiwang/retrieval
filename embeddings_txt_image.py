@@ -38,6 +38,7 @@ r.set('image:1', image_vector)
 #import pdb
 #pdb.set_trace()
 
+# Extract text features (vector) using CLIP model
 query = ["A photo of Apple", "Find me a phto of butterfly"]  # Input Query
 text_inputs = tokenizer(query, padding=True, return_tensors="pt")
 text_inputs = text_inputs.to("xpu")
@@ -55,13 +56,13 @@ stored_text_vector = np.frombuffer(r.get('text:1'), dtype=np.float32)
 print("Stored image vector:", stored_image_vector)
 print("Stored text vector:", stored_text_vector)
 
+# Extract image and text features (vector) using CLIP model
 inputs = processor(text=["a photo of a cat", "a photo of a dog"], images=image, return_tensors="pt", padding=True)
 inputs = inputs.to('xpu')
 
 with torch.no_grad():
     with torch.autocast('xpu'):
         outputs = model(**inputs)
-
 '''
 logits_per_image = outputs.logits_per_image  # this is the image-text similarity score
 print(logits_per_image)
