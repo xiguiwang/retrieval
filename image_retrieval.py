@@ -10,8 +10,9 @@ import time
 from redis_rw import create_index, is_index_existed
 from redis.commands.search.query import Query  # Import Query
 
+from utils import display_images_in_batch, filter_match_image, generate_template
 from clip_embedding import CLIP_Embedding
-from utils import display_images_in_batch
+from blip import LVM_model
 
 import argparse
 
@@ -35,6 +36,11 @@ if (not is_index_existed("myIndex")):
 model_name = "openai/clip-vit-base-patch32"
 device = "xpu"
 embedding_model = CLIP_Embedding(model_name, device)
+
+lvm_model_name = "Salesforce/blip2-flan-t5-xl"
+#lvm_model_name = "/home/xwang/.cache/huggingface/hub/models--Salesforce--blip2-flan-t5-xl/snapshots/2839125572785ff89d2438c8bf1550a98c7fcfcd"
+lvm_device = "xpu"
+multiModel = LVM_model(lvm_model_name, lvm_device)
 
 # Function to preprocess images
 def preprocess_images(image_paths):
@@ -114,6 +120,7 @@ text_embeddings = embedding_model.embed_query(query)
 search_imgae_paths = search_images_by_embedding(text_embeddings, top_k=4)
 display_images_in_batch(search_imgae_paths)
 
+top_k = 4
 while True:
     user_input = input("Enter something (type 'exit' to quit): ").strip()  # Strip removes extra spaces
     if user_input.lower() == "exit":  # Check if the input is 'exit', case insensitive
@@ -125,4 +132,8 @@ while True:
             text_embeddings = embedding_model.embed_query(user_input) 
             search_imgae_paths = search_images_by_embedding(text_embeddings, top_k=4)
             # Display the results
-            display_images_in_batch(search_imgae_paths)
+            query_string = generate_template(user_input)
+            questions = [query_string] * len(search_imgae_paths) 
+            answers = multiModel.get_image_query_answer(search_imgae_paths, questions)
+            match_image = filter_match_image(search_imgae_paths, answers)
+            display_images_in_batch(match_image)

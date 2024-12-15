@@ -18,3 +18,18 @@ def display_images_in_batch(image_paths, batch_size=4):
             plt.title(f"Image {i + idx + 1}")  # Optional: Add titles to images
 
         plt.show()
+
+def filter_match_image(search_imgae_paths, answers):
+    match_images = []
+    for idx, answer in enumerate(answers):
+        if (answer.lower() == 'yes'): 
+            match_images.append(search_imgae_paths[idx]) 
+    return match_images 
+
+# image_paths = ["0201_1.jpg", "demo.jpg"]  # Replace with the path to your image
+# Define your question
+def generate_template(user_query):
+    questions = f"Does the descritption match the image , answser yes or no. descritption: '{user_query}'"
+        #questions = ["Does the descritption of image right, answser yes or no. descritption: 'There is one dog in the image.'", 
+    return questions 
+
