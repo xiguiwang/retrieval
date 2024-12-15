@@ -15,7 +15,7 @@ def is_index_existed(index_name):
     except Exception as e:
         # If FT.INFO fails, the index likely doesn't exist
         print(f"Error creating index: {e}")
-        print("Index 'myIndex' does not exist. Creating a new one...")
+        print("Index myIndex does not exist. Creating a new one...")
         return False
 
 # Create a Redis Search index for image and text vectors
@@ -29,7 +29,7 @@ def create_index():
             VectorField("vector", "FLAT", { "TYPE": "float32", "DIM": vector_dimension, "DISTANCE_METRIC": "COSINE" }),
             TagField("id")  # Store the ID for easy lookup
         ], definition=IndexDefinition(prefix=["image:"], index_type=IndexType.HASH))
-        print("Index "myIndex" created successfully.")
+        print("Index created successfully.")
     except Exception as e:
         print(f"Error creating index: {e}")
 

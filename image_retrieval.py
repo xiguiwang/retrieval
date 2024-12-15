@@ -71,11 +71,15 @@ def embed_and_store_images(image_paths, batch_size=32):
 def search_similar_images(query_image_path, top_k=5):
     # Step 1: Process the query image
     query_image = Image.open(query_image_path).convert("RGB")
-
     # Step 2: Get image embedding for the query image
     query_embedding = embedding_model.get_image_embeddings(query_image) 
+
+    search_images_path = search_images_by_embedding(query_embedding, top_k)
+    return search_images_path 
+
+# Function to retrieve similar images based on a query
+def search_images_by_embedding(query_embedding, top_k=5):
     query_vector = np.array(query_embedding.cpu(), dtype=np.float32).tobytes()  # Convert to bytes for Redis
-    
     query_str = "*=>[KNN 5 @vector $query_vector]"  # Top 2 nearest neighbors
 
     # Perform the search (Redis will return the closest matches)
@@ -99,7 +103,14 @@ if (args.embedding):
 
 # Example: Querying for a similar image
 query_image_path = "/home/xwang/Downloads/image/0201_18.jpg"
-search_imgae_paths = search_similar_images(query_image_path, top_k=5)
+#search_imgae_paths = search_similar_images(query_image_path, top_k=5)
+#query_image = Image.open(query_image_path).convert("RGB")
+#query_embedding = embedding_model.get_image_embeddings(query_image)
+#search_imgae_paths = search_images_by_embedding(query_embedding, top_k=5)
+
+query = ["A photo of Family photo"] # Input Query
+text_embeddings = embedding_model.embed_query(query) 
+search_imgae_paths = search_images_by_embedding(text_embeddings, top_k=5)
 
 # Display the results
 display_images_in_batch(search_imgae_paths)
