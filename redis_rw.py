@@ -5,6 +5,19 @@ from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 # Connect to Redis
 r = redis.Redis(host='localhost', port=6379, db=0)
 
+# Check if index existed in DB
+def is_index_existed(index_name):
+    try:
+        # Check if the index exists
+        if r.ft(index_name).info():  # FT.INFO command checks if the index exists
+            print("Index 'myIndex' already exists. Skipping creation.")
+            return True
+    except Exception as e:
+        # If FT.INFO fails, the index likely doesn't exist
+        print(f"Error creating index: {e}")
+        print("Index 'myIndex' does not exist. Creating a new one...")
+        return False
+
 # Create a Redis Search index for image and text vectors
 def create_index():
     try:
