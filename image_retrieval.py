@@ -11,7 +11,7 @@ from redis_rw import create_index, is_index_existed
 from redis.commands.search.query import Query  # Import Query
 
 from clip_embedding import CLIP_Embedding
-from utils import display_image
+from utils import display_images_in_batch
 
 import argparse
 
@@ -19,10 +19,9 @@ import argparse
 parser = argparse.ArgumentParser(description="Process embedding input.")
 parser.add_argument(
     "--embedding",
-    type=str,
-    required=False,  # It's optional now
+    action="store_true",
     default=False,   # Default value set to False
-    help="Path to the embedding file or input data."
+    help="Set embedding to True (default: False)"
 )
 # Parse the arguments
 args = parser.parse_args()
@@ -103,4 +102,4 @@ query_image_path = "/home/xwang/Downloads/image/0201_18.jpg"
 search_imgae_paths = search_similar_images(query_image_path, top_k=5)
 
 # Display the results
-display_image(search_imgae_paths)
+display_images_in_batch(search_imgae_paths)

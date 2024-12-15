@@ -9,3 +9,7 @@ services:
     ports:
       - "6379:6379"
       - "8001:8001"
+    volumes:
+      - "/disk/redis_data:/data" # Persist Redis data in the current directory
+    environment:
+      REDIS_ARGS: "--save 60 1 --appendonly yes"
