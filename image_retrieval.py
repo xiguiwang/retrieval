@@ -80,7 +80,7 @@ def search_similar_images(query_image_path, top_k=5):
 # Function to retrieve similar images based on a query
 def search_images_by_embedding(query_embedding, top_k=5):
     query_vector = np.array(query_embedding.cpu(), dtype=np.float32).tobytes()  # Convert to bytes for Redis
-    query_str = "*=>[KNN 5 @vector $query_vector]"  # Top 2 nearest neighbors
+    query_str = f"*=>[KNN {top_k} @vector $query_vector]"  # Top 2 nearest neighbors
 
     # Perform the search (Redis will return the closest matches)
     search_results = r.ft("myIndex").search(
@@ -108,9 +108,21 @@ query_image_path = "/home/xwang/Downloads/image/0201_18.jpg"
 #query_embedding = embedding_model.get_image_embeddings(query_image)
 #search_imgae_paths = search_images_by_embedding(query_embedding, top_k=5)
 
-query = ["A photo of Family photo"] # Input Query
+query = ["A photo of Family"] # Input Query
+print("Family photo")
 text_embeddings = embedding_model.embed_query(query) 
-search_imgae_paths = search_images_by_embedding(text_embeddings, top_k=5)
-
-# Display the results
+search_imgae_paths = search_images_by_embedding(text_embeddings, top_k=4)
 display_images_in_batch(search_imgae_paths)
+
+while True:
+    user_input = input("Enter something (type 'exit' to quit): ").strip()  # Strip removes extra spaces
+    if user_input.lower() == "exit":  # Check if the input is 'exit', case insensitive
+        print("Exiting the loop. Goodbye!")
+        break
+    else:
+        print(f"You entered: {user_input}")
+        if (len(user_input) > 0):
+            text_embeddings = embedding_model.embed_query(user_input) 
+            search_imgae_paths = search_images_by_embedding(text_embeddings, top_k=4)
+            # Display the results
+            display_images_in_batch(search_imgae_paths)
