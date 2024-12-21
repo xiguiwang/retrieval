@@ -92,7 +92,7 @@ def search_images_by_embedding(query_embedding, top_k):
 
     # Perform the search (Redis will return the closest matches)
     search_results = r.ft("myIndex").search(
-        query=Query(query_str).return_fields("id", "path", "vector").dialect(2),
+        query=Query(query_str).return_fields("id", "path", "vector").paging(0, top_k).dialect(2),
         query_params={"query_vector": query_vector},
     )
 

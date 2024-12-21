@@ -1,17 +1,35 @@
 import redis
 import numpy as np
+from PIL import Image
 
-# Connect to Redis Stack running locally in Docker
-r = redis.Redis(host='localhost', port=6379, db=0)
+from clip_embedding import CLIP_Embedding
 
-# Example: Add a vector to Redis Stack (ensure you're using the correct vector data type)
-vector = np.array([0.1, 0.2, 0.3], dtype=np.float32).tobytes()
+model_name = "openai/clip-vit-base-patch32"
+device = "xpu"
+embedding_model = CLIP_Embedding(model_name, device)
 
-# Store the vector in Redis
-r.set('vector_key', vector)
+# Connect to Redis
+r = redis.StrictRedis(host="localhost", port=6379, db=0)
 
-# Retrieve the vector
-stored_vector = np.frombuffer(r.get('vector_key'), dtype=np.float32)
+image_ids = r.keys("image:*")
+# Decode and print the keys
+image_key_ids = [key.decode("utf-8") for key in image_ids]
 
-print("Stored vector:", stored_vector)
+## Retrieve the stored data
+#image_id = "image:your_image_name.jpg"  # Replace with the correct image ID
+for key in image_key_ids:
+    stored_data = r.hget(key, "vector")  # Get the "vector" field from the Redis hash
+    image_path = r.hget(key, "path")  # Get the "vector" field from the Redis hash
+    if stored_data:
+        # Convert the binary data back to a NumPy array
+        print(image_path)
+        image_vector = np.frombuffer(stored_data, dtype=np.float32)
+
+        query_image = Image.open(image_path).convert("RGB")
+        query_embedding = embedding_model.get_image_embeddings(query_image) 
+        query_embedding = query_embedding.cpu().numpy().astype(np.float32)
+        #print("Decoded vector:", query_embedding)
+        print(np.mean(np.abs(query_embedding - image_vector)))
+    else:
+        print(f"No vector found for ID: {image_id}")
 
