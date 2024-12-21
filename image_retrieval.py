@@ -10,7 +10,7 @@ import time
 from redis_rw import create_index, is_index_existed
 from redis.commands.search.query import Query  # Import Query
 
-from utils import display_images_in_batch, filter_match_image, generate_template
+from utils import display_images_in_batch, filter_match_image, generate_template, extract_date_from_jpeg
 from clip_embedding import CLIP_Embedding
 from blip import LVM_model
 
@@ -30,15 +30,16 @@ args = parser.parse_args()
 # Initialize Redis connection
 r = redis.Redis(host='localhost', port=6379, db = 0) #decode_responses=True)
 
-if (not is_index_existed("myIndex")):
-    create_index()
+Index_name = "myIndex"
+if (not is_index_existed(Index_name)):
+    create_index(Index_name)
 
 model_name = "openai/clip-vit-base-patch32"
 device = "xpu"
 embedding_model = CLIP_Embedding(model_name, device)
 
-lvm_model_name = "Salesforce/blip2-flan-t5-xl"
-#lvm_model_name = "/home/xwang/.cache/huggingface/hub/models--Salesforce--blip2-flan-t5-xl/snapshots/2839125572785ff89d2438c8bf1550a98c7fcfcd"
+#lvm_model_name = "Salesforce/blip2-flan-t5-xl"
+lvm_model_name = "/home/xwang/.cache/huggingface/hub/models--Salesforce--blip2-flan-t5-xl/snapshots/2839125572785ff89d2438c8bf1550a98c7fcfcd"
 lvm_device = "xpu"
 multiModel = LVM_model(lvm_model_name, lvm_device)
 
@@ -67,9 +68,10 @@ def embed_and_store_images(image_paths, batch_size=32):
 
             # Use a unique ID for each image (you could use the image file name or a custom ID)
             image_id = f"image:{os.path.basename(img_path)}"
+            date = extract_date_from_jpeg(images[idx])
 
             # Store the image vector in Redis
-            r.hset(image_id, mapping={"vector": image_vector, "id": image_id, "path": image_path[idx]})
+            r.hset(image_id, mapping={"vector": image_vector, "id": image_id, "path": image_path[idx], "date": date})
 
         print(f"Batch {i//batch_size + 1} processed and stored in Redis.")
 
@@ -84,7 +86,7 @@ def search_similar_images(query_image_path, top_k=5):
     return search_images_path 
 
 # Function to retrieve similar images based on a query
-def search_images_by_embedding(query_embedding, top_k=5):
+def search_images_by_embedding(query_embedding, top_k):
     query_vector = np.array(query_embedding.cpu(), dtype=np.float32).tobytes()  # Convert to bytes for Redis
     query_str = f"*=>[KNN {top_k} @vector $query_vector]"  # Top 2 nearest neighbors
 
@@ -98,14 +100,14 @@ def search_images_by_embedding(query_embedding, top_k=5):
     return search_images_path 
 
 # Example usage
-image_folder = "/home/xwang/Downloads/image"  # Folder containing images
+image_folder = "/mnt/Photo"  # Folder containing images
 image_paths = [os.path.join(image_folder, fname) for fname in os.listdir(image_folder) if fname.endswith(".jpg")]
 
 # Process the images and store them in Redis
 if (args.embedding):
     print("Start ingest images into Database. ")
     print(f"Process images in {image_folder} Waiting for minutes ....")
-    embed_and_store_images(image_paths, batch_size=32)
+    embed_and_store_images(image_paths, batch_size=128)
 
 # Example: Querying for a similar image
 query_image_path = "/home/xwang/Downloads/image/0201_18.jpg"
@@ -120,7 +122,7 @@ text_embeddings = embedding_model.embed_query(query)
 search_imgae_paths = search_images_by_embedding(text_embeddings, top_k=4)
 display_images_in_batch(search_imgae_paths)
 
-top_k = 4
+top_k = 60
 while True:
     user_input = input("Enter something (type 'exit' to quit): ").strip()  # Strip removes extra spaces
     if user_input.lower() == "exit":  # Check if the input is 'exit', case insensitive
@@ -130,10 +132,13 @@ while True:
         print(f"You entered: {user_input}")
         if (len(user_input) > 0):
             text_embeddings = embedding_model.embed_query(user_input) 
-            search_imgae_paths = search_images_by_embedding(text_embeddings, top_k=4)
+            search_imgae_paths = search_images_by_embedding(text_embeddings, top_k)
+            print("search images:", len(search_imgae_paths))
+            display_images_in_batch(search_imgae_paths)
             # Display the results
             query_string = generate_template(user_input)
             questions = [query_string] * len(search_imgae_paths) 
             answers = multiModel.get_image_query_answer(search_imgae_paths, questions)
             match_image = filter_match_image(search_imgae_paths, answers)
+            print(f"accuracy iamges:", len(match_image))
             display_images_in_batch(match_image)

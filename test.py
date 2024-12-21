@@ -1,52 +1,48 @@
+import tkinter as tk
+from tkinter import filedialog, Label, Entry
 
-from PIL import Image
-from PIL.ExifTags import TAGS
-
-import redis
-
-# Retrieve data for a specific image ID
-def get_image_data(redis_client, image_id):
-    vector_key = f"image:{image_id}"
-    data = redis_client.hgetall(vector_key)
+def open_file_dialog():
+    # Open file dialog to select an image
+    file_path = filedialog.askopenfilename(
+        title="Select an Image",
+        filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.bmp;*.gif")]
+    )
     
-    # Decode the vector from binary
-    vector = np.frombuffer(data[b"vector"], dtype=np.float32)
-    
-    # Decode other fields
-    image_path = data[b"path"].decode("utf-8")
-    image_id = data[b"id"].decode("utf-8")
-    image_date = data[b"date"].decode("utf-8")
-    
-    return {
-        "vector": vector,
-        "path": image_path,
-        "id": image_id,
-        "date": image_date
-    }
+    if file_path:
+        # Update the label with the selected file path
+        label_file.config(text=f"Selected: {file_path}")
+    else:
+        label_file.config(text="No file selected.")
 
-def extract_date_from_jpeg(image_path):
-    try:
-        # Open the image
-        image = Image.open(image_path)
-        
-        # Extract EXIF metadata
-        exif_data = image._getexif()
-        if exif_data is not None:
-            # Search for the 'DateTimeOriginal' or 'DateTime' field
-            for tag_id, value in exif_data.items():
-                tag = TAGS.get(tag_id, tag_id)
-                if tag in ("DateTimeOriginal", "DateTime"):
-                    return value  # Return the date and time
-        return "No EXIF date found in the image."
-    except Exception as e:
-        return f"Error: {e}"
+def get_text_input():
+    # Get the input text from the entry box
+    user_input = entry.get()
+    label_text.config(text=f"Input: {user_input}")
 
-# Example usage
-image_path = "0201_1.jpg"
-date = extract_date_from_jpeg(image_path)
-print(f"Date extracted from image: {date}")
+# Create the main Tkinter window
+root = tk.Tk()
+root.title("Image Selector with Text Input")
+root.geometry("500x300")
 
+# Add an entry box for text input
+entry = Entry(root, width=40)
+entry.pack(pady=10)
 
-# Retrieve the data
-#image_data = get_image_data(r, "12345")
-#print("Retrieved data:", image_data)
+# Add a button to submit the text input
+button_text = tk.Button(root, text="Submit Text", command=get_text_input)
+button_text.pack(pady=5)
+
+# Add a label to display the text input
+label_text = Label(root, text="Enter text above and click submit.")
+label_text.pack(pady=10)
+
+# Add a button to open the file dialog
+button_file = tk.Button(root, text="Select Image", command=open_file_dialog)
+button_file.pack(pady=10)
+
+# Add a label to display the selected file path
+label_file = Label(root, text="No file selected.")
+label_file.pack(pady=10)
+
+# Start the Tkinter event loop
+root.mainloop()

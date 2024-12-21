@@ -1,11 +1,12 @@
 import matplotlib.pyplot as plt
 from PIL import Image
+from PIL.ExifTags import TAGS
 
-def display_images_in_batch(image_paths, batch_size=4):
+def display_images_in_batch(image_paths, batch_size=8):
     if len(image_paths) == 0:
         print("Empty image set. Nothing to display.")
         return
-    
+
     for i in range(0, len(image_paths), batch_size):
         batch = image_paths[i:i + batch_size]
         plt.figure(figsize=(15, 10))  # Adjust the figure size (width, height)
@@ -33,3 +34,20 @@ def generate_template(user_query):
         #questions = ["Does the descritption of image right, answser yes or no. descritption: 'There is one dog in the image.'", 
     return questions 
 
+
+def extract_date_from_jpeg(image):
+    try:
+        # Open the image
+        #image = Image.open(image_path)
+
+        # Extract EXIF metadata
+        exif_data = image._getexif()
+        if exif_data is not None:
+            # Search for the 'DateTimeOriginal' or 'DateTime' field
+            for tag_id, value in exif_data.items():
+                tag = TAGS.get(tag_id, tag_id)
+                if tag in ("DateTimeOriginal", "DateTime"):
+                    return value  # Return the date and time
+        return "No EXIF date found in the image."
+    except Exception as e:
+        return f"Error: {e}"

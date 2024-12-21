@@ -10,22 +10,22 @@ def is_index_existed(index_name):
     try:
         # Check if the index exists
         if r.ft(index_name).info():  # FT.INFO command checks if the index exists
-            print("Find Index 'myIndex'...")
+            print(f"Find Index {index_name}...")
             return True
     except Exception as e:
         # If FT.INFO fails, the index likely doesn't exist
         print(f"Error creating index: {e}")
-        print("Index myIndex does not exist. Creating a new one...")
+        print("Index {index_name} does not exist. Creating a new one...")
         return False
 
 # Create a Redis Search index for image and text vectors
-def create_index():
+def create_index(index_name):
     try:
         # Define the vector dimension (e.g., 512 for CLIP model)
         vector_dimension = 512
         
         # Define the index for storing image and text vectors
-        r.ft("myIndex").create_index([
+        r.ft(index_name).create_index([
             VectorField("vector", "FLAT", { "TYPE": "float32", "DIM": vector_dimension, "DISTANCE_METRIC": "COSINE" }),
             TagField("id")  # Store the ID for easy lookup
         ], definition=IndexDefinition(prefix=["image:"], index_type=IndexType.HASH))
