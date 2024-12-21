@@ -88,15 +88,20 @@ def search_similar_images(query_image_path, top_k=5):
 # Function to retrieve similar images based on a query
 def search_images_by_embedding(query_embedding, top_k):
     query_vector = np.array(query_embedding.cpu(), dtype=np.float32).tobytes()  # Convert to bytes for Redis
-    query_str = f"*=>[KNN {top_k} @vector $query_vector]"  # Top 2 nearest neighbors
+    query_str = f"*=>[KNN {top_k} @vector $query_vector AS score]"  # Top k nearest neighbors
 
     # Perform the search (Redis will return the closest matches)
     search_results = r.ft("myIndex").search(
-        query=Query(query_str).return_fields("id", "path", "vector").paging(0, top_k).dialect(2),
+        query=Query(query_str).
+        sort_by("score", asc=False).
+        #return_fields("id", "path", "vector").paging(0, top_k).dialect(2),
+        return_fields("id", "path", "vector", "score").paging(0, top_k).dialect(2),
         query_params={"query_vector": query_vector},
     )
 
     search_images_path = [result.path for result in search_results.docs]
+    #score = [result.score for result in search_results.docs]
+    #print(score)
     return search_images_path 
 
 # Example usage
@@ -134,7 +139,7 @@ while True:
             text_embeddings = embedding_model.embed_query(user_input) 
             search_imgae_paths = search_images_by_embedding(text_embeddings, top_k)
             print("search images:", len(search_imgae_paths))
-            display_images_in_batch(search_imgae_paths)
+            # display_images_in_batch(search_imgae_paths)
             # Display the results
             query_string = generate_template(user_input)
             questions = [query_string] * len(search_imgae_paths) 

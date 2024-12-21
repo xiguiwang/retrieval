@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
 from PIL import Image
 from PIL.ExifTags import TAGS
+import os
 
-def display_images_in_batch(image_paths, batch_size=8):
+def display_images_in_batch(image_paths, batch_size=15):
     if len(image_paths) == 0:
         print("Empty image set. Nothing to display.")
         return
@@ -11,13 +12,14 @@ def display_images_in_batch(image_paths, batch_size=8):
         batch = image_paths[i:i + batch_size]
         plt.figure(figsize=(15, 10))  # Adjust the figure size (width, height)
 
+        rows, cols = 3, 5
         for idx, image_path in enumerate(batch):
             image = Image.open(image_path)
-            plt.subplot(1, len(batch), idx + 1)  # Create subplots (1 row, len(batch) columns)
+            plt.subplot(rows, cols, idx + 1)  # Create subplots (rows, columns)
             plt.imshow(image)
             plt.axis("off")  # Hide axes
-            plt.title(f"Image {i + idx + 1}")  # Optional: Add titles to images
-
+            plt.title(f"{i + idx + 1} {os.path.basename(image_path)}")  # titles to images
+        plt.tight_layout()
         plt.show()
 
 def filter_match_image(search_imgae_paths, answers):
