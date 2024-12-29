@@ -88,4 +88,32 @@ def get_image_id(image_file):
     image_id_new = f"{image_id_old}_{md5_hash}"
 
     return image_id_new
+
+def resize_image_keeping_ratio(image, target_size):
+    width, height = image.size
+    target_width, target_height = target_size
+
+    aspect_ratio = width / height
+    target_aspect_ratio = target_width / target_height
+
+    if aspect_ratio > target_aspect_ratio:
+        # The image is wider than the target aspect ratio
+        new_width = target_width
+        new_height = int(target_width / aspect_ratio)
+    else:
+        # The image is taller than the target aspect ratio
+        new_height = target_height
+        new_width = int(target_height * aspect_ratio)
+
+    resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    
+    # Create a new blank image with the target size and paste the resized image onto it
+    '''
+    final_image = Image.new("RGB", target_size)
+    x_offset = (target_width - new_width) // 2
+    y_offset = (target_height - new_height) // 2
+    final_image.paste(resized_image, (x_offset, y_offset))
+    '''
+
+    return resized_image
     
