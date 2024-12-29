@@ -164,15 +164,17 @@ def main():
             if (len(user_input) > 0):
                 text_embeddings = embedding_model.embed_query(user_input) 
                 search_imgae_paths = search_images_by_embedding(redis_db, text_embeddings, top_k)
+                
                 print("search images:", len(search_imgae_paths))
-                # display_images_in_batch(search_imgae_paths)
-                # Display the results
-                query_string = generate_template(user_input)
-                questions = [query_string] * len(search_imgae_paths) 
-                answers = multiModel.get_image_query_answer(search_imgae_paths, questions)
-                match_image = filter_match_image(search_imgae_paths, answers)
-                print(f"accuracy iamges:", len(match_image))
-                display_images_in_batch(match_image)
+                if len(search_imgae_paths) > 0:
+                    # display_images_in_batch(search_imgae_paths)
+                    # Display the results
+                    query_string = generate_template(user_input)
+                    questions = [query_string] * len(search_imgae_paths) 
+                    answers = multiModel.get_image_query_answer(search_imgae_paths, questions)
+                    match_image = filter_match_image(search_imgae_paths, answers)
+                    print(f"accuracy iamges:", len(match_image))
+                    display_images_in_batch(match_image)
 
 if __name__ == '__main__':
     # Explicitly set the start method for Windows
