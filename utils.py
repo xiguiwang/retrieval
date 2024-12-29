@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt
+from pathlib import Path
 from PIL import Image
 from PIL.ExifTags import TAGS
 import os
+import hashlib
 
 def display_images_in_batch(image_paths, batch_size=15):
     if len(image_paths) == 0:
@@ -52,4 +54,38 @@ def extract_date_from_jpeg(image):
                     return value  # Return the date and time
         return "No EXIF date found in the image."
     except Exception as e:
-        return f"Error: {e}"
+        return "1900-01-01"
+
+def list_all_directories(root_dir):
+    root_path = Path(root_dir)
+    return [str(p) for p in root_path.rglob('*') if p.is_dir()]
+
+
+def test_list_dirs(root_directory):
+    all_directories = list_all_directories(root_directory)
+
+    img_sum = 0
+    with open('image_list.txt', 'w', encoding='utf-8') as file:
+        for image_folder in all_directories:
+            print(f"Process images in {image_folder} Waiting for minutes ....")
+            image_paths = []
+            image_paths = [os.path.join(image_folder, fname) for fname in os.listdir(image_folder) if fname.lower().endswith(".jpg")]
+            img_count = len(image_paths)
+            img_sum = img_sum + len(image_paths)
+            sum_str = f"{image_folder}: Number of Images {img_count}, Total {img_sum}"
+            file.write(sum_str + '\n')
+            for path in image_paths:
+                file.write(path + '\n')
+            print(sum_str)
+        print(sum_str)
+
+
+def get_image_id(image_file):
+    # Use a unique ID for each image (you could use the image file name or a custom ID)
+    image_id_old = f"image:{os.path.basename(image_file)}"
+
+    md5_hash = hashlib.md5(image_file.encode()).hexdigest()
+    image_id_new = f"{image_id_old}_{md5_hash}"
+
+    return image_id_new
+    

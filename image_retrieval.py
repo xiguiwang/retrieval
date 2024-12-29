@@ -11,10 +11,10 @@ from redis_rw import create_index, is_index_existed
 from redis.commands.search.query import Query  # Import Query
 
 from utils import display_images_in_batch, filter_match_image, generate_template, extract_date_from_jpeg
+from utils import list_all_directories, get_image_id
 from clip_embedding import CLIP_Embedding
 from blip import LVM_model
-
-import multiprocessing
+import hashlib
 
 import argparse
 
@@ -53,33 +53,46 @@ def connect_redis():
 
 # Function to preprocess images
 def preprocess_images(image_paths):
-    images = [Image.open(image_path).convert("RGB") for image_path in image_paths]
-    full_image_paths = [image_path for image_path in image_paths ]
+    images = []
+    full_image_paths = []
+    for image_path in image_paths:
+        try:
+            images.append(Image.open(image_path).convert("RGB"))
+            full_image_paths.append(image_path)
+        except Exception as e:
+            print(f"Error read {image_path}: {e}")
     return images, full_image_paths
 
 # Function to embed and store images in Redis
-def embed_and_store_images(embedding_model, redis_db, image_paths, batch_size=32):
+def embed_and_store_images(embedding_model, redis_db, images_path_list, batch_size=32):
     # Step 1: Process images in batches
-    for i in tqdm(range(0, len(image_paths), batch_size), desc="Processing batches"):
-        batch_paths = image_paths[i:i+batch_size]
+    for i in tqdm(range(0, len(images_path_list), batch_size), desc="Processing batches"):
+        img_paths_batch = images_path_list[i:i+batch_size]
 
         # Step 2: Preprocess the images
-        images, image_path = preprocess_images(batch_paths)
+        images_data, images_path = preprocess_images(img_paths_batch)
+        if (len(images_data) != len(images_path)):
+            # process next batch if errors in preprocess images
+            continue
 
         # Step 4: Get image embeddings
-        image_features = embedding_model.get_image_embeddings(images) 
+        image_features = embedding_model.get_image_embeddings(images_data) 
 
         # Step 5: Store embeddings in Redis
-        for idx, img_path in enumerate(batch_paths):
+        for idx, img_path in enumerate(images_path):
             # Convert image features to bytes (Redis supports binary data)
             image_vector = image_features[idx].cpu().numpy().astype(np.float32).tobytes()
 
             # Use a unique ID for each image (you could use the image file name or a custom ID)
-            image_id = f"image:{os.path.basename(img_path)}"
-            date = extract_date_from_jpeg(images[idx])
+            md5_hash = hashlib.md5(img_path.encode()).hexdigest()
+            image_id = f"image:{os.path.basename(img_path)}_{md5_hash}"
 
+            date = extract_date_from_jpeg(img_path)
             # Store the image vector in Redis
-            redis_db.hset(image_id, mapping={"vector": image_vector, "id": image_id, "path": image_path[idx], "date": date})
+            try:
+                redis_db.hset(image_id, mapping={"vector": image_vector, "id": image_id, "path": img_path, "date": date})
+            except Exception as e:
+                print(f"Error write {img_path}: {e}")
 
         print(f"Batch {i//batch_size + 1} processed and stored in Redis.")
 
@@ -123,12 +136,16 @@ def main():
 
     # Process the images and store them in Redis
     if (args.embedding):
+        print("Start ingest images into Database. ")
         if (args.folder is not None):
-            image_folder = args.folder
-            image_paths = [os.path.join(image_folder, fname) for fname in os.listdir(image_folder) if fname.lower().endswith(".jpg")]
-            print("Start ingest images into Database. ")
-            print(f"Process images in {image_folder} Waiting for minutes ....")
-            embed_and_store_images(embedding_model, redis_db, image_paths, batch_size=32)
+            root_directory = args.folder
+            all_directories = list_all_directories(root_directory)
+            all_directories.append(root_directory)
+            for image_folder in all_directories:
+                images_path_list = []
+                images_path_list = [os.path.join(image_folder, fname) for fname in os.listdir(image_folder) if fname.lower().endswith(".jpg")]
+                print(f"Process images in {image_folder} Waiting for minutes ....")
+                embed_and_store_images(embedding_model, redis_db, images_path_list, batch_size=128)
 
     query = ["A photo of Family"] # Input Query
     print("Family photo")
@@ -159,7 +176,6 @@ def main():
 
 if __name__ == '__main__':
     # Explicitly set the start method for Windows
-    multiprocessing.set_start_method('spawn')
 
     # Create the parser
     parser = argparse.ArgumentParser(description="Process embedding input.")
