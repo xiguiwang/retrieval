@@ -98,13 +98,29 @@ def embed_and_store_images(embedding_model, redis_db, images_path_list, batch_si
 
 # Function to retrieve similar images based on a query
 def search_similar_images(embedding_model, db, query_image_path, top_k=5):
+    search_images_path = []
     # Step 1: Process the query image
-    query_image = Image.open(query_image_path).convert("RGB")
-    # Step 2: Get image embedding for the query image
-    query_embedding = embedding_model.get_image_embeddings(query_image) 
+    try:
+        query_image = Image.open(query_image_path).convert("RGB")
+    except Exception as e:
+        print(f"Error write {img_path}: {e}")
 
-    search_images_path = search_images_by_embedding(db, query_embedding, top_k)
+    # Step 2: Get image embedding for the query image
+    if query_image is not None:
+        query_embedding = embedding_model.get_image_embeddings(query_image)
+
+    if (query_embedding is not None):
+        search_images_path = search_images_by_embedding(db, query_embedding, top_k)
     return search_images_path
+
+def search_images_by_text(embedding_model, db, input_text, top_k=5):
+    search_image_paths = []
+    if (input_text != ""):
+        text_embeddings = embedding_model.embed_query(input_text)
+        if (text_embeddings is not None):
+            search_image_paths = search_images_by_embedding(db, text_embeddings, top_k)
+
+    return search_image_paths
 
 # Function to retrieve similar images based on a query
 def search_images_by_embedding(redis_db, query_embedding, top_k):

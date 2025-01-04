@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, Label, Entry, ttk
 
 from image_retrieval import load_clip_model, load_lvm_model, connect_redis
-from image_retrieval import search_images_by_embedding, search_similar_images
+from image_retrieval import search_similar_images, search_images_by_text
 from utils import display_images_in_batch, filter_match_image, generate_template
 from utils import resize_image_keeping_ratio
 from PIL import Image, ImageTk
@@ -11,8 +11,12 @@ import webbrowser
 import os
 import threading
 
-user_input = "a photo of Family"
-input_image = "test.image"
+from enum import Enum
+
+class SearchType(Enum):
+    BY_TEXT = 1
+    BY_IMAGE = 2
+    BY_TEXT_AND_IMAGE = 3
 
 entry = None
 button_search_text = None
@@ -24,9 +28,24 @@ accuracy_search_checked = None
 image_frame = None
 canvas = None
 
+input_image = None
+
+def open_original_image(image_path):
+    webbrowser.open(image_path)
+
+def get_input_text():
+    global entry
+    # Get the input text from the entry box
+    return entry.get()
+def clear_image():
+    global image_frame, canvas
+
+    for widget in image_frame.winfo_children():
+        widget.destroy()
+    canvas.configure(scrollregion=canvas.bbox("all"))
+
 def open_ref_image():
     global input_image
-
     file_path = filedialog.askopenfilename(
         title = "Select an Image",
         filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif")]
@@ -42,46 +61,100 @@ def open_ref_image():
         #search_imgae_paths = search_similar_images(embedding_model, redis_db, input_image, top_k)
         #display_images_in_batch(search_imgae_paths)
 
+def is_accurate_search():
+    global accuracy_search_checked
+    if accuracy_search_checked.get():
+        accuracy_search = True
+    else:
+        accuracy_search = False
+    return accuracy_search
+
 def search_by_image():
     global input_image
     global multiModel
     global embedding_model
     global redis_db
-    global scale, accuracy_search_checked
+    global scale
 
-    if accuracy_search_checked.get():
-        accuracy_search = True
-    else:
-        accuracy_search = False
-
+    accuracy_search = is_accurate_search()
     top_k = scale.get()
-    print("Search Number:", top_k)
+    search_type = SearchType.BY_IMAGE
+    print(f"Search Number: {top_k}, accurate search: {accuracy_search}, \
+          Search by: {search_type.name}, {input_image}")
 
     if (input_image):
         button_search_text.config(state=tk.DISABLED)
         button_search_image.config(state=tk.DISABLED)
-        threading.Thread(target=search_images_and_display, args = (embedding_model, redis_db, input_image, top_k,),
         #threading.Thread(target=search_images_and_display, args = (top_k,),
-            daemon=True).start()
+        threading.Thread(target=search_images_and_display,
+                         args = (embedding_model, multiModel,
+                                 redis_db, input_image, None,
+                                 search_type, accuracy_search, top_k),
+                         daemon=True).start()
     #display_images_in_batch(search_imgae_paths)
 
-def search_images_and_display(embedding_model, redis_db, input_image, top_k):
-#def search_images_and_display(top_k):
-    global image_frame, canvas
+def search_by_text():
+    global multiModel
+    global embedding_model
+    global redis_db
+    global entry, button_search_text
+    global scale
 
-    for widget in image_frame.winfo_children():
-        widget.destroy()
-    canvas.configure(scrollregion=canvas.bbox("all"))
+    accuracy_search = is_accurate_search()
+    top_k = scale.get()
+    input_text = get_input_text()
+    search_type = SearchType.BY_TEXT
+    print(f"Search Number: {top_k}, accurate search: {accuracy_search}, \
+          Search by: {search_type.name}, {input_text}")
+
+    if (input_text):
+        button_search_text.config(state=tk.DISABLED)
+        button_search_image.config(state=tk.DISABLED)
+        #threading.Thread(target=search_images_and_display, args = (top_k,),
+        threading.Thread(target=search_images_and_display,
+                         args = (embedding_model, multiModel,
+                                 redis_db, None, input_text,
+                                 search_type, accuracy_search, top_k),
+                         daemon=True).start()
+
+def search_images_and_display(Embed_model, Lvm_model, db,
+                              ref_image, text,
+                              search_type, accuracy_search = False, top_k = 5):
+    clear_image()
 
     thumbnails = []
-    search_images_path = search_similar_images(embedding_model, redis_db, input_image, top_k)
+
+    if search_type == SearchType.BY_IMAGE:
+        search_images_path = search_similar_images(embedding_model, db, ref_image, top_k)
+    elif search_type == SearchType.BY_TEXT:
+        search_images_path = search_images_by_text(embedding_model, db, text, top_k)
+    elif search_type == SearchType.BY_TEXT_AND_IMAGE:
+        print("searet type", search_type)
+    else:
+        print("Unsupported searet type", search_type)
+
+    display_images = search_images_path
+
+    if (accuracy_search):
+        if (text):
+            query_string = generate_template(text)
+            questions = [query_string] * len(search_images_path)
+            answers = multiModel.get_image_query_answer(search_images_path, questions)
+            match_image = filter_match_image(search_images_path, answers)
+            display_images = match_image
+            print(f"accuracy images:", len(display_images))
+            #display_images_in_batch(match_image)
+        else:
+            print(f"Fast search images:", len(search_images_path))
+            #display_images_in_batch(search_imgae_paths)
+
     '''
     search_images_path = filedialog.askopenfilenames(
         title = "Select an Image",
         filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif")]
     )
     '''
-    for image_path in search_images_path:
+    for image_path in display_images:
         image = Image.open(image_path)
         image.thumbnail((200,200))
         photo = ImageTk.PhotoImage(image)
@@ -108,50 +181,11 @@ def update_ui(thumbnails):
             col = 0
             row += 1
 
-        canvas.update_idletasks()
-        canvas.configure(scrollregion=canvas.bbox("all"))
+    canvas.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
 
-        button_search_text.config(state=tk.NORMAL)
-        button_search_image.config(state=tk.NORMAL)
-
-def open_original_image(image_path):
-    webbrowser.open(image_path)
-
-def search_by_text():
-    global user_input
-    global multiModel
-    global embedding_model
-    global redis_db
-    global entry, button_search_text
-    global scale, accuracy_search_checked
-
-    if accuracy_search_checked.get():
-        accuracy_search = True
-    else:
-        accuracy_search = False
-
-    top_k = scale.get()
-    print("Search Number:", top_k)
-
-    # Get the input text from the entry box
-    user_input = entry.get()
-    if (user_input != ""):
-        text_embeddings = embedding_model.embed_query(user_input) 
-    else:
-        return
-
-    search_imgae_paths = search_images_by_embedding(redis_db, text_embeddings, top_k)
-
-    if (accuracy_search):
-        query_string = generate_template(user_input)
-        questions = [query_string] * len(search_imgae_paths) 
-        answers = multiModel.get_image_query_answer(search_imgae_paths, questions)
-        match_image = filter_match_image(search_imgae_paths, answers)
-        print(f"accuracy images:", len(match_image))
-        display_images_in_batch(match_image)
-    else:
-        print(f"Fast search images:", len(search_imgae_paths))
-        display_images_in_batch(search_imgae_paths)
+    button_search_text.config(state=tk.NORMAL)
+    button_search_image.config(state=tk.NORMAL)
 
 def load_models():
     global embedding_model, multiModel, redis_db
@@ -173,7 +207,7 @@ def create_gui():
     scale_frame = tk.Frame(root)
     scale_frame.pack(pady=5)
 
-    scale = tk.Scale(scale_frame, from_=0, to=200, length = 400, orient=tk.HORIZONTAL)
+    scale = tk.Scale(scale_frame, from_=1, to=200, length = 400, orient=tk.HORIZONTAL)
     scale.pack(side=tk.LEFT, padx = 10, pady=10)
 
     accuracy_search_checked = tk.BooleanVar()
@@ -223,7 +257,6 @@ def create_gui():
 
     # Start the Tkinter event loop
     root.mainloop()
-
 
 def main():
     # Create and start a separate thread to load models
