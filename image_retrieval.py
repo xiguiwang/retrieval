@@ -141,6 +141,12 @@ def search_images_by_embedding(redis_db, query_embedding, top_k):
     #print(score)
     return search_images_path 
 
+def is_image_match_text(multiModel, image_lst, text):
+    query_string = generate_template(text)
+    questions = [query_string] * len(image_lst)
+    answers = multiModel.get_image_query_answer(image_lst, questions)
+    return answers
+
 def main():
     embedding_model = load_clip_model()
     multiModel = load_lvm_model()
@@ -175,20 +181,27 @@ def main():
         if user_input.lower() == "exit":  # Check if the input is 'exit', case insensitive
             print("Exiting the loop. Goodbye!")
             break
+        elif "top_k" in user_input.lower():
+            parts = user_input.split()
+            if len(parts) > 1:
+                number_str = parts[1]
+                top_k = int(number_str)
         else:
             print(f"You entered: {user_input}")
             if (len(user_input) > 0):
-                text_embeddings = embedding_model.embed_query(user_input) 
-                search_imgae_paths = search_images_by_embedding(redis_db, text_embeddings, top_k)
+                search_imgae_paths = search_images_by_text(embedding_model, redis_db, user_input, top_k)
                 
                 print("search images:", len(search_imgae_paths))
+                import time
                 if len(search_imgae_paths) > 0:
                     # display_images_in_batch(search_imgae_paths)
                     # Display the results
-                    query_string = generate_template(user_input)
-                    questions = [query_string] * len(search_imgae_paths) 
-                    answers = multiModel.get_image_query_answer(search_imgae_paths, questions)
+                    start = time.time()
+                    answers = is_image_match_text(multiModel, search_imgae_paths, user_input)
+                    duration = time.time() - start
+                    print(f"bach process time: {duration}, num {top_k} ", len(search_imgae_paths))
                     match_image = filter_match_image(search_imgae_paths, answers)
+
                     print(f"accuracy iamges:", len(match_image))
                     display_images_in_batch(match_image)
 

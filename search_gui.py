@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, Label, Entry, ttk
 
 from image_retrieval import load_clip_model, load_lvm_model, connect_redis
-from image_retrieval import search_similar_images, search_images_by_text
+from image_retrieval import search_similar_images, search_images_by_text, is_image_match_text
 from utils import display_images_in_batch, filter_match_image, generate_template
 from utils import resize_image_keeping_ratio
 from PIL import Image, ImageTk
@@ -10,6 +10,7 @@ from PIL import Image, ImageTk
 import webbrowser
 import os
 import threading
+import queue
 
 from enum import Enum
 
@@ -18,7 +19,10 @@ class SearchType(Enum):
     BY_IMAGE = 2
     BY_TEXT_AND_IMAGE = 3
 
-entry = None
+# 全局队列，用于线程间通信
+thumbnail_queue = queue.Queue()
+
+text_entry = None
 button_search_text = None
 button_ref_img = None
 image_label = None #display selected image
@@ -27,17 +31,16 @@ scale = None
 accuracy_search_checked = None
 image_frame = None
 canvas = None
-
 input_image = None
 
 def open_original_image(image_path):
     webbrowser.open(image_path)
 
 def get_input_text():
-    global entry
-    # Get the input text from the entry box
-    return entry.get()
-def clear_image():
+    global text_entry
+    # Get the input text from the text_text_entry box
+    return text_entry.get()
+def clear_display_image():
     global image_frame, canvas
 
     for widget in image_frame.winfo_children():
@@ -97,7 +100,7 @@ def search_by_text():
     global multiModel
     global embedding_model
     global redis_db
-    global entry, button_search_text
+    global text_entry, button_search_text
     global scale
 
     accuracy_search = is_accurate_search()
@@ -120,10 +123,8 @@ def search_by_text():
 def search_images_and_display(Embed_model, Lvm_model, db,
                               ref_image, text,
                               search_type, accuracy_search = False, top_k = 5):
-    clear_image()
-
-    thumbnails = []
-
+    global thumbnail_queue
+    clear_display_image()
     if search_type == SearchType.BY_IMAGE:
         search_images_path = search_similar_images(embedding_model, db, ref_image, top_k)
     elif search_type == SearchType.BY_TEXT:
@@ -133,34 +134,39 @@ def search_images_and_display(Embed_model, Lvm_model, db,
     else:
         print("Unsupported searet type", search_type)
 
-    display_images = search_images_path
-
-    if (accuracy_search):
-        if (text):
-            query_string = generate_template(text)
-            questions = [query_string] * len(search_images_path)
-            answers = multiModel.get_image_query_answer(search_images_path, questions)
-            match_image = filter_match_image(search_images_path, answers)
-            display_images = match_image
-            print(f"accuracy images:", len(display_images))
-            #display_images_in_batch(match_image)
+    thumbnails = []
+    batch_size = 32  # 每次处理的图片数量
+    for i in range(0, len(search_images_path), batch_size):
+        batch_images = search_images_path[i:i + batch_size]
+        if (accuracy_search and text):
+            answers = is_image_match_text(multiModel, batch_images, text)
+            display_images = filter_match_image(batch_images, answers)
         else:
-            print(f"Fast search images:", len(search_images_path))
-            #display_images_in_batch(search_imgae_paths)
+            display_images = batch_images
 
-    '''
-    search_images_path = filedialog.askopenfilenames(
-        title = "Select an Image",
-        filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif")]
-    )
-    '''
-    for image_path in display_images:
-        image = Image.open(image_path)
-        image.thumbnail((200,200))
-        photo = ImageTk.PhotoImage(image)
-        thumbnails.append((photo, image_path))
+        for image_path in display_images:
+            image = Image.open(image_path)
+            image.thumbnail((200,200))
+            photo = ImageTk.PhotoImage(image)
+            thumbnails.append((photo, image_path))
+        # 将 thumbnails 放入队列
+        print(f"generate {i}/{len(display_images)} ")
+        thumbnail_queue.put(thumbnails)
+        thumbnails = []
 
-    root.after(0, update_ui, thumbnails)
+        # 通知主线程更新 UI
+        root.after(0, process_thumbnail_queue)
+    button_search_text.config(state=tk.NORMAL)
+    button_search_image.config(state=tk.NORMAL)
+
+def process_thumbnail_queue():
+    global thumbnail_queue
+
+    """从队列中取出 thumbnails 并更新 UI"""
+    while not thumbnail_queue.empty():
+        thumbnails = thumbnail_queue.get()
+        update_ui(thumbnails)
+
 
 def update_ui(thumbnails):
     global image_frame
@@ -169,6 +175,7 @@ def update_ui(thumbnails):
     columns = 5
     row, col = len(image_frame.winfo_children()) // columns, len(image_frame.winfo_children()) % columns
 
+    print("display batch_images", len(thumbnails))
     for photo, file_path in thumbnails:
         thumbnail_label = tk.Label(image_frame, image=photo)
         thumbnail_label.image = photo
@@ -184,8 +191,6 @@ def update_ui(thumbnails):
     canvas.update_idletasks()
     canvas.configure(scrollregion=canvas.bbox("all"))
 
-    button_search_text.config(state=tk.NORMAL)
-    button_search_image.config(state=tk.NORMAL)
 
 def load_models():
     global embedding_model, multiModel, redis_db
@@ -195,7 +200,7 @@ def load_models():
     print("Models loaded successfully")
 
 def create_gui():
-    global entry, button_search_text, button_ref_img, root, image_label
+    global text_entry, button_search_text, button_ref_img, root, image_label
     global scale, accuracy_search_checked, button_search_image
     global image_frame, canvas
 
@@ -218,9 +223,9 @@ def create_gui():
     text_frame = tk.Frame(root)
     text_frame.pack(pady=5)
 
-    # Add an entry box for text input
-    entry = Entry(text_frame, width=40, font=("Arial", 14))
-    entry.pack(side=tk.LEFT, padx = 10, pady=10)
+    # Add an text_entry box for text input
+    text_entry = Entry(text_frame, width=40, font=("Arial", 14))
+    text_entry.pack(side=tk.LEFT, padx = 10, pady=10)
 
 
     # Add a button to submit search_by_text
