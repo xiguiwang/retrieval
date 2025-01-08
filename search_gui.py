@@ -11,6 +11,7 @@ import webbrowser
 import os
 import threading
 import queue
+import time
 
 from enum import Enum
 
@@ -29,17 +30,23 @@ image_label = None #display selected image
 button_search_image = None
 scale = None
 accuracy_search_checked = None
+search_by_text_and_image = None
 image_frame = None
 canvas = None
 input_image = None
+display_label = None
 
 def open_original_image(image_path):
     webbrowser.open(image_path)
 
-def get_input_text():
+def get_input_text(clear_text):
     global text_entry
-    # Get the input text from the text_text_entry box
-    return text_entry.get()
+    # Get the input text from the text box
+    text = text_entry.get()
+    if clear_text:
+        text_entry.delete(0, tk.END)
+    return text
+
 def clear_display_image():
     global image_frame, canvas
 
@@ -72,6 +79,14 @@ def is_accurate_search():
         accuracy_search = False
     return accuracy_search
 
+def is_search_by_txt_and_img():
+    global search_by_text_and_image
+    if search_by_text_and_image.get():
+        search_by_txt_and_img = True
+    else:
+        search_by_txt_and_img = False
+    return search_by_txt_and_img
+
 def search_by_image():
     global input_image
     global multiModel
@@ -82,16 +97,29 @@ def search_by_image():
     accuracy_search = is_accurate_search()
     top_k = scale.get()
     search_type = SearchType.BY_IMAGE
-    print(f"Search Number: {top_k}, accurate search: {accuracy_search}, \
-          Search by: {search_type.name}, {input_image}")
+
+    srch_by_txt_and_img = is_search_by_txt_and_img()
 
     if (input_image):
+        if accuracy_search:
+            input_text = get_input_text(clear_text = True)
+            if srch_by_txt_and_img and input_text:
+                text = input_text
+            else:
+                question = "Please describle the picture."
+                input_image_lst =  [input_image]
+                question_lst = [question]
+                output = multiModel.get_image_query_answer(input_image_lst, question_lst)
+                text = output[0]
+                print("image:", text)
+        else:
+            text = None
         button_search_text.config(state=tk.DISABLED)
         button_search_image.config(state=tk.DISABLED)
         #threading.Thread(target=search_images_and_display, args = (top_k,),
         threading.Thread(target=search_images_and_display,
                          args = (embedding_model, multiModel,
-                                 redis_db, input_image, None,
+                                 redis_db, input_image, text,
                                  search_type, accuracy_search, top_k),
                          daemon=True).start()
     #display_images_in_batch(search_imgae_paths)
@@ -105,10 +133,8 @@ def search_by_text():
 
     accuracy_search = is_accurate_search()
     top_k = scale.get()
-    input_text = get_input_text()
+    input_text = get_input_text(clear_text = False)
     search_type = SearchType.BY_TEXT
-    print(f"Search Number: {top_k}, accurate search: {accuracy_search}, \
-          Search by: {search_type.name}, {input_text}")
 
     if (input_text):
         button_search_text.config(state=tk.DISABLED)
@@ -126,13 +152,21 @@ def search_images_and_display(Embed_model, Lvm_model, db,
     global thumbnail_queue
     clear_display_image()
     if search_type == SearchType.BY_IMAGE:
+        start = time.time()
         search_images_path = search_similar_images(embedding_model, db, ref_image, top_k)
+        duration = time.time() - start
     elif search_type == SearchType.BY_TEXT:
+        start = time.time()
         search_images_path = search_images_by_text(embedding_model, db, text, top_k)
+        duration = time.time() - start
     elif search_type == SearchType.BY_TEXT_AND_IMAGE:
         print("searet type", search_type)
     else:
         print("Unsupported searet type", search_type)
+
+    info = f"Search Number: {top_k}, accurate search: {accuracy_search}, \
+          Search by: {search_type.name}, {text}, time: {duration}"
+    display_label.config(text=info)
 
     thumbnails = []
     batch_size = 32  # 每次处理的图片数量
@@ -202,7 +236,7 @@ def load_models():
 def create_gui():
     global text_entry, button_search_text, button_ref_img, root, image_label
     global scale, accuracy_search_checked, button_search_image
-    global image_frame, canvas
+    global image_frame, canvas, display_label, search_by_text_and_image
 
     # Create the main Tkinter window
     root = tk.Tk()
@@ -220,10 +254,15 @@ def create_gui():
     checkbutton = tk.Checkbutton(scale_frame, text="Accurate Search", variable=accuracy_search_checked)
     checkbutton.pack(side=tk.LEFT, padx = 10, pady=10)
 
+    search_by_text_and_image = tk.BooleanVar()
+    # Create check boxes
+    checkbutton2 = tk.Checkbutton(scale_frame, text="search_by_text_and_image", variable=search_by_text_and_image)
+    checkbutton2.pack(side=tk.LEFT, padx = 10, pady=10)
+
     text_frame = tk.Frame(root)
     text_frame.pack(pady=5)
 
-    # Add an text_entry box for text input
+    # Add an text box for text input
     text_entry = Entry(text_frame, width=40, font=("Arial", 14))
     text_entry.pack(side=tk.LEFT, padx = 10, pady=10)
 
@@ -238,6 +277,9 @@ def create_gui():
 
     button_frame = tk.Frame(root)
     button_frame.pack(pady=5)
+
+    display_label = tk.Label(root, text="")
+    display_label.pack(pady=10)
 
     # Add a button to open the file dialog
     button_ref_img = tk.Button(button_frame, text="Select Reference Image", command=open_ref_image, font=("Arial", 14))

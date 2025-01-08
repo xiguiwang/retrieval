@@ -19,7 +19,8 @@ import hashlib
 import argparse
 
 def load_clip_model():    
-    model_name = "openai/clip-vit-base-patch32"
+    #model_name = "openai/clip-vit-base-patch32"
+    model_name = r"C:\Users\wxg\.cache\huggingface\hub\models--openai--clip-vit-base-patch32\snapshots\3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268"
     device = "xpu"
     try:
         embedding_model = CLIP_Embedding(model_name, device)
@@ -30,7 +31,8 @@ def load_clip_model():
 
 def load_lvm_model():
     lvm_device = "xpu"
-    lvm_model_name = "Salesforce/blip2-flan-t5-xl"
+    #lvm_model_name = "Salesforce/blip2-flan-t5-xl"
+    lvm_model_name = r"C:\Users\wxg\.cache\huggingface\hub\models--Salesforce--blip2-flan-t5-xl\snapshots\2839125572785ff89d2438c8bf1550a98c7fcfcd"
     try:
         #lvm_model_name = "/home/xwang/.cache/huggingface/hub/models--Salesforce--blip2-flan-t5-xl/snapshots/2839125572785ff89d2438c8bf1550a98c7fcfcd"
         multiModel = LVM_model(lvm_model_name, lvm_device)
@@ -189,10 +191,11 @@ def main():
         else:
             print(f"You entered: {user_input}")
             if (len(user_input) > 0):
+                start = time.time()
                 search_imgae_paths = search_images_by_text(embedding_model, redis_db, user_input, top_k)
+                duration = time.time() - start
                 
-                print("search images:", len(search_imgae_paths))
-                import time
+                print(f"search images: {len(search_imgae_paths)}, duration {duration} ")
                 if len(search_imgae_paths) > 0:
                     # display_images_in_batch(search_imgae_paths)
                     # Display the results
@@ -203,7 +206,7 @@ def main():
                     match_image = filter_match_image(search_imgae_paths, answers)
 
                     print(f"accuracy iamges:", len(match_image))
-                    display_images_in_batch(match_image)
+                    display_images_in_batch(match_image, 20)
 
 if __name__ == '__main__':
     # Explicitly set the start method for Windows

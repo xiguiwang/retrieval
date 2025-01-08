@@ -14,7 +14,9 @@ def display_images_in_batch(image_paths, batch_size=15):
         batch = image_paths[i:i + batch_size]
         plt.figure(figsize=(15, 10))  # Adjust the figure size (width, height)
 
-        rows, cols = 3, 5
+        #rows, cols = 3, 5
+        cols = 5
+        rows = int(batch_size / 5)
         for idx, image_path in enumerate(batch):
             image = Image.open(image_path)
             plt.subplot(rows, cols, idx + 1)  # Create subplots (rows, columns)
@@ -34,7 +36,7 @@ def filter_match_image(search_imgae_paths, answers):
 # image_paths = ["0201_1.jpg", "demo.jpg"]  # Replace with the path to your image
 # Define your question
 def generate_template(user_query):
-    questions = f"Does the descritption match the image , answser yes or no. descritption: '{user_query}'"
+    questions = f"Does the description match the image? Answser yes or no. Description: {user_query}"
         #questions = ["Does the descritption of image right, answser yes or no. descritption: 'There is one dog in the image.'", 
     return questions 
 
