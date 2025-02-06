@@ -3,6 +3,10 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
 
+from scipy.spatial.distance import cosine
+import numpy as np
+import glob
+
 def load_model():
     # 1. 加载 ResNet-50 预训练模型
     model = models.resnet50(pretrained=True)
@@ -33,8 +37,6 @@ def resnet_extract_features(image_path):
 image_list = ["E:\\tmp\\scene_change_frames_001.png", "E:\\tmp\\scene_change_frames_002.png",
               "E:\\tmp\\scene_change_frames_003.png", "E:\\tmp\\scene_change_frames_004.png",]
 
-from scipy.spatial.distance import cosine
-
 feature1 = resnet_extract_features(image_list[1])
 feature2 = resnet_extract_features(image_list[3])
 
@@ -62,3 +64,40 @@ feature2 = extract_vgg_features(image_list[3])
 
 similarity = 1 - cosine(feature1, feature2)
 print(f"余弦相似度: {similarity}")
+
+
+
+# **批量提取多个图像的 VGG 特征**
+def extract_vgg_features_batch(image_paths):
+    images = []
+    for image_path in image_paths:
+        img = Image.open(image_path).convert("RGB")
+        img = transform(img)
+        images.append(img)
+
+    # **构造 batch**
+    batch = torch.stack(images)  # (batch_size, 3, 224, 224)
+    
+    with torch.no_grad():
+        # 先提取卷积特征，再展平
+        features = vgg.features(batch).view(batch.shape[0], -1)
+        features = vgg_feature_extractor(features)  # (batch_size, 4096)
+    
+    return features.numpy()
+
+# **批量处理多个图片**
+image_paths = glob.glob("E:\\tmp\\*.png")  # 例如，处理 frames 文件夹中的所有 .jpg 图片
+features = extract_vgg_features_batch(image_paths)  # 形状: (num_images, 4096)
+
+# **计算所有图片之间的相似度**
+num_images = len(features)
+similarities = np.zeros((num_images, num_images))
+
+for i in range(num_images):
+    for j in range(i + 1, num_images):  # 只计算上三角矩阵，减少重复计算
+        similarities[i, j] = 1 - cosine(features[i], features[j])
+        similarities[j, i] = similarities[i, j]  # 对称矩阵
+
+# **输出相似度矩阵**
+print("图像相似度矩阵：")
+print(similarities)
