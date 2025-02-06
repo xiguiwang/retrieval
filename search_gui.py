@@ -173,16 +173,20 @@ def search_images_and_display(Embed_model, Lvm_model, db,
     for i in range(0, len(search_images_path), batch_size):
         batch_images = search_images_path[i:i + batch_size]
         if (accuracy_search and text):
+            start = time.time()
             answers = is_image_match_text(multiModel, batch_images, text)
+            duration = time.time() - start
+            print(f"LVM search {text}, duration {duration}, batch_size={batch_size}")
             display_images = filter_match_image(batch_images, answers)
         else:
             display_images = batch_images
 
         for image_path in display_images:
-            image = Image.open(image_path)
-            image.thumbnail((200,200))
-            photo = ImageTk.PhotoImage(image)
-            thumbnails.append((photo, image_path))
+            if (os.path.exists(image_path)):
+                image = Image.open(image_path)
+                image.thumbnail((200,200))
+                photo = ImageTk.PhotoImage(image)
+                thumbnails.append((photo, image_path))
         # 将 thumbnails 放入队列
         print(f"generate {i}/{len(display_images)} ")
         thumbnail_queue.put(thumbnails)

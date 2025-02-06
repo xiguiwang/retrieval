@@ -108,11 +108,14 @@ def search_similar_images(embedding_model, db, query_image_path, top_k=5):
         print(f"Error write {img_path}: {e}")
 
     # Step 2: Get image embedding for the query image
+    start = time.time()
     if query_image is not None:
         query_embedding = embedding_model.get_image_embeddings(query_image)
 
     if (query_embedding is not None):
         search_images_path = search_images_by_embedding(db, query_embedding, top_k)
+    duration = time.time() - start
+    print("image retrieval duration", duration)
     return search_images_path
 
 def search_images_by_text(embedding_model, db, input_text, top_k=5):
@@ -132,15 +135,20 @@ def search_images_by_embedding(redis_db, query_embedding, top_k):
     # Perform the search (Redis will return the closest matches)
     search_results = redis_db.ft("myIndex").search(
         query=Query(query_str).
-        sort_by("score", asc=True).
+        sort_by("score", asc=False).
         #return_fields("id", "path", "vector").paging(0, top_k).dialect(2),
         return_fields("id", "path", "vector", "score").paging(0, top_k).dialect(2),
         query_params={"query_vector": query_vector},
     )
 
-    search_images_path = [result.path for result in search_results.docs]
-    score = [result.score for result in search_results.docs]
-    #print(score)
+    search_images_path = []
+    score = []
+    for result in search_results.docs:
+        if hasattr(result, 'path'):
+            search_images_path.append(result.path)
+            score.append(result.score)
+    #score = [result.score for result in search_results.docs]
+    print(score)
     return search_images_path 
 
 def is_image_match_text(multiModel, image_lst, text):
@@ -159,7 +167,7 @@ def main():
     #image_paths = [os.path.join(image_folder, fname) for fname in os.listdir(image_folder) if fname.endswith(".jpg")]
 
     # Process the images and store them in Redis
-    if (args.embedding):
+    if (args.import_img):
         print("Start ingest images into Database. ")
         if (args.folder is not None):
             root_directory = args.folder
@@ -214,17 +222,17 @@ if __name__ == '__main__':
     # Create the parser
     parser = argparse.ArgumentParser(description="Process embedding input.")
     parser.add_argument(
-        "--embedding",
+        "--import-img",
         action="store_true",
         default=False,   # Default value set to False
-        help="Set embedding to True (default: False)"
+        help="Set import image to True (default: False)"
     )
 
     parser.add_argument(
         "--folder",
         type=str,
         default="image_path",   # Default value set to False
-        help="Set embedding to True (default: False)"
+        help="Set import image path"
     )
     # Parse the arguments
     args = parser.parse_args()
