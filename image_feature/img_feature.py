@@ -47,16 +47,26 @@ print(f"余弦相似度: {similarity}")
 # 加载 VGG16 预训练模型
 vgg = models.vgg16(pretrained=True)
 vgg.eval()
+print(vgg)
+
+# 定义图像预处理
+preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
 
 # 只取倒数第二层的 `fc2` 层输出 (4096 维)
 vgg_feature_extractor = torch.nn.Sequential(*list(vgg.classifier.children())[:-1])
+vgg16_fc2_extractor = torch.nn.Sequential(vgg.features, vgg.avgpool, torch.nn.Flatten(), vgg_feature_extractor)
 
 # 预处理 + 提取特征
 def extract_vgg_features(image_path):
     img = Image.open(image_path).convert("RGB")
-    img = transform(img).unsqueeze(0)
+    input_batch  = preprocess(img).unsqueeze(0)
     with torch.no_grad():
-        features = vgg_feature_extractor(vgg.features(img).view(img.shape[0], -1))
+        features = vgg16_fc2_extractor(input_batch)
     return features.squeeze().numpy()
 
 feature1 = extract_vgg_features(image_list[1])
