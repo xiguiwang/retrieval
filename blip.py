@@ -1,4 +1,8 @@
 from transformers import Blip2Processor, Blip2ForConditionalGeneration
+# Load model directly
+from transformers import AutoProcessor, AutoModelForImageTextToText
+
+
 from PIL import Image
 import torch
 
@@ -8,7 +12,10 @@ class LVM_model:
         #model_name = "Salesforce/blip2-flan-t5-xl"
         self.processor = Blip2Processor.from_pretrained(model_name) 
         self.model = Blip2ForConditionalGeneration.from_pretrained(model_name, torch_dtype=torch.float16).to(device)
+        #self.processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-3B-Instruct")
+        #self.model = AutoModelForImageTextToText.from_pretrained("Qwen/Qwen2.5-VL-3B-Instruct")
         self.model = self.model.eval()
+        self.model = torch.compile(self.model)
         self.device = device
         return
    

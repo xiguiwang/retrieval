@@ -32,6 +32,7 @@ def load_clip_model():
 def load_lvm_model():
     lvm_device = "xpu"
     #lvm_model_name = "Salesforce/blip2-flan-t5-xl"
+    #lvm_model_name  = "Qwen/Qwen2.5-VL-3B-Instruct"
     lvm_model_name = r"C:\Users\wxg\.cache\huggingface\hub\models--Salesforce--blip2-flan-t5-xl\snapshots\2839125572785ff89d2438c8bf1550a98c7fcfcd"
     try:
         #lvm_model_name = "/home/xwang/.cache/huggingface/hub/models--Salesforce--blip2-flan-t5-xl/snapshots/2839125572785ff89d2438c8bf1550a98c7fcfcd"
