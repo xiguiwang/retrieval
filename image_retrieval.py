@@ -34,7 +34,8 @@ Index_name = "myIndex"
 if (not is_index_existed(Index_name)):
     create_index(Index_name)
 
-model_name = "openai/clip-vit-base-patch32"
+#model_name = "openai/clip-vit-base-patch32"
+model_name = "/home/xwang/.cache/huggingface/hub/models--openai--clip-vit-base-patch32/snapshots/3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268"
 device = "xpu"
 embedding_model = CLIP_Embedding(model_name, device)
 
